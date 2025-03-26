@@ -4,3 +4,6 @@ datasets
 torch
 scikit-learn
 numpy
+AutoTokenizer
+AutoModelForSequenceClassification
+
