@@ -27,11 +27,11 @@ def load_data(uploaded_file):
 
 # Function to predict grade
 def predict_grade(concept, student_response):
-    # Combine the concept and student response for the model input
-    combined_input = f"{concept} {student_response}"
+    # Format the input text more explicitly
+    combined_input = f"Concept: {concept}. Student's answer: {student_response}"
 
-    # Tokenize the combined input
-    inputs = tokenizer(combined_input, return_tensors="pt", truncation=True, padding=True)
+    # Tokenize the combined input (ensuring padding and truncation)
+    inputs = tokenizer(combined_input, return_tensors="pt", truncation=True, padding=True, max_length=512)
     
     with torch.no_grad():
         outputs = model(**inputs)
@@ -39,7 +39,7 @@ def predict_grade(concept, student_response):
     # Get the predicted class
     predicted_class = torch.argmax(outputs.logits, dim=1).item()
     
-    return grade_mapping[predicted_class]
+    return grade_mapping.get(predicted_class, "Unknown Grade")
 
 # Streamlit UI
 st.title("Student Grade Prediction")
@@ -68,6 +68,5 @@ if uploaded_file is not None:
             st.warning("Please enter a student response.")
 else:
     st.warning("Please upload a CSV file with the dataset.")
-
 
 
