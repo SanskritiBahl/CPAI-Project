@@ -4,5 +4,7 @@ datasets
 torch
 scikit-learn
 numpy
+streamlit
+huggingface_hub
 
 
