@@ -1,72 +1,57 @@
-# CPAI-Project
 import streamlit as st
+import pandas as pd
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
-import pandas as pd
-from huggingface_hub import login
 
-# Authenticate Hugging Face if you're using a private model
-login(token=st.secrets["huggingface"]["token"])
+# ✅ File uploader to load dataset manually
+st.title("📚 AI-Powered Student Grading")
+uploaded_file = st.file_uploader("behavioral_economics_dataset.csv", type="csv")
 
-# Model path (local or Hugging Face model name)
-# Example Hugging Face model name (replace with your model if needed)
-model_path = "bert-base-uncased"
+if uploaded_file:
+    df = pd.read_csv(uploaded_file)
 
-# Load tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained(model_path)
-model = AutoModelForSequenceClassification.from_pretrained(model_path)
+    # ✅ Ensure 'Concept' column exists
+    if "Concept" in df.columns:
+        unique_concepts = df["Concept"].dropna().unique().tolist()
+    else:
+        st.error("🚨 'Concept' column not found in dataset! Please check the file.")
+        st.stop()
 
-# Grade mapping (for your use case)
-grade_mapping = {0: "A+", 1: "A", 2: "B", 3: "C", 4: "D", 5: "F"}
+    # ✅ Load model & tokenizer (with error handling)
+    MODEL_NAME = "bert-base-uncased"
 
-# Load and display the CSV file when uploaded
-@st.cache_data
-def load_data(uploaded_file):
-    # Load the dataset CSV into a pandas dataframe
-    return pd.read_csv(uploaded_file)
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+        model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME, num_labels=10)
+    except Exception as e:
+        st.error(f"🚨 Model loading failed! Error: {e}")
+        st.stop()
 
-# Function to predict grade
-def predict_grade(concept, student_response):
-    # Format the input text more explicitly
-    combined_input = f"Concept: {concept}. Student's answer: {student_response}"
+    # ✅ Grade mapping
+    grade_mapping = {0: "A+", 1: "A", 2: "A-", 3: "B+", 4: "B", 5: "B-", 6: "C+", 7: "C", 8: "D", 9: "F"}
 
-    # Tokenize the combined input (ensuring padding and truncation)
-    inputs = tokenizer(combined_input, return_tensors="pt", truncation=True, padding=True, max_length=512)
-    
-    with torch.no_grad():
-        outputs = model(**inputs)
-    
-    # Get the predicted class
-    predicted_class = torch.argmax(outputs.logits, dim=1).item()
-    
-    return grade_mapping.get(predicted_class, "Unknown Grade")
+    # ✅ Function to predict grade
+    def predict_grade(concept, student_response):
+        combined_input = f"Concept: {concept}. Student Answer: {student_response}"
+        inputs = tokenizer(combined_input, return_tensors="pt", truncation=True, padding=True)
 
-# Streamlit UI
-st.title("Student Grade Prediction")
-st.write("Enter the concept and the student's response to predict the grade:")
+        with torch.no_grad():
+            outputs = model(**inputs)
 
-# Upload CSV file
-uploaded_file = st.file_uploader("Upload Dataset (CSV)", type="csv")
+        predicted_class = torch.argmax(outputs.logits, dim=1).item()
+        return grade_mapping.get(predicted_class, "Unknown")
 
-# Display the contents of the uploaded file (optional)
-if uploaded_file is not None:
-    data = load_data(uploaded_file)
-    st.write(data.head())  # Display the first few rows of the dataset
+    # ✅ Streamlit UI for Concept Selection
+    st.write("Select the concept from the dropdown and enter the student's response to predict their grade.")
 
-    # Concept input (let's assume dataset has a column 'Concept')
-    concept = st.selectbox("Select Concept", options=data["Concept"].unique())
+    concept = st.selectbox("🧠 Select Concept", unique_concepts)
+    student_answer = st.text_area("📝 Student's Answer", height=150)
 
-    # Input box for student’s response
-    student_answer = st.text_area("Student's Answer", height=200)
-
-    # Button to trigger prediction
-    if st.button("Predict Grade"):
+    if st.button("🎯 Predict Grade"):
         if student_answer:
             predicted_grade = predict_grade(concept, student_answer)
-            st.success(f"Predicted Grade: {predicted_grade}")
+            st.success(f"✅ Predicted Grade: **{predicted_grade}**")
         else:
-            st.warning("Please enter a student response.")
+            st.warning("⚠️ Please enter the student's response.")
 else:
-    st.warning("Please upload a CSV file with the dataset.")
-
-
+    st.warning("⚠️ Please upload the dataset to proceed.")
