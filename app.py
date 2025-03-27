@@ -5,10 +5,14 @@ import torch
 
 # ✅ File uploader to load dataset manually
 st.title("📚 AI-Powered Student Grading")
-uploaded_file = st.file_uploader("behavioral_economics_dataset.csv", type="csv")
+uploaded_file = st.file_uploader("Upload Behavioral Economics Dataset (CSV)", type="csv")
 
 if uploaded_file:
     df = pd.read_csv(uploaded_file)
+
+    # ✅ Show dataset after upload
+    st.write("Here is the dataset you've uploaded:")
+    st.dataframe(df)  # Displays the uploaded dataset as a table
 
     # ✅ Ensure 'Concept' column exists
     if "Concept" in df.columns:
@@ -55,3 +59,4 @@ if uploaded_file:
             st.warning("⚠️ Please enter the student's response.")
 else:
     st.warning("⚠️ Please upload the dataset to proceed.")
+
