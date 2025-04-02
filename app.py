@@ -45,6 +45,23 @@ if uploaded_file:
         predicted_class = torch.argmax(outputs.logits, dim=1).item()
         return grade_mapping.get(predicted_class, "Unknown")
 
+    # ✅ Function to generate feedback based on grade
+    def generate_feedback(grade):
+        feedback_mapping = {
+            "A+": "Excellent work! You have a deep understanding of the concept.",
+            "A": "Great job! You're very close to mastering this concept.",
+            "A-": "Good work, but there's room for improvement. Review the key concepts.",
+            "B+": "You're on the right track, but you might need more practice with the concept.",
+            "B": "Solid effort, but you need to focus on understanding the underlying principles.",
+            "B-": "You need to work on understanding the core concept more clearly.",
+            "C+": "Your response shows some understanding, but there are key areas that need attention.",
+            "C": "You have basic knowledge of the topic, but additional study is needed.",
+            "C-": "You're struggling with the core concepts. Please seek additional help.",
+            "D": "Your answer needs improvement. Consider revisiting the material.",
+            "F": "Unfortunately, your understanding of the concept is insufficient. Please review the content again."
+        }
+        return feedback_mapping.get(grade, "No feedback available")
+
     # ✅ Streamlit UI for Concept Selection
     st.write("Select the concept from the dropdown and enter the student's response to predict their grade.")
 
@@ -54,9 +71,10 @@ if uploaded_file:
     if st.button("🎯 Predict Grade"):
         if student_answer:
             predicted_grade = predict_grade(concept, student_answer)
+            feedback = generate_feedback(predicted_grade)
             st.success(f"✅ Predicted Grade: **{predicted_grade}**")
+            st.write(f"📋 **Feedback**: {feedback}")
         else:
             st.warning("⚠️ Please enter the student's response.")
 else:
     st.warning("⚠️ Please upload the dataset to proceed.")
-
