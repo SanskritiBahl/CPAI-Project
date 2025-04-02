@@ -27,7 +27,7 @@ def load_and_process_data(uploaded_file):
         train_dataset = Dataset.from_pandas(train_df[['Concept', 'Student_Response', 'Grade_Label']])
         test_dataset = Dataset.from_pandas(test_df[['Concept', 'Student_Response', 'Grade_Label']])
 
-        return train_dataset, test_dataset, grade_mapping
+        return train_dataset, test_dataset, df, grade_mapping
     else:
         st.error("🚨 'Concept', 'Student_Response', or 'Faculty_Grade' column not found in dataset! Please check the file.")
         st.stop()
@@ -109,22 +109,24 @@ def generate_feedback(grade):
     return feedback_mapping.get(grade, "No feedback available")
 
 # Streamlit UI for Concept Selection
-st.write("Select the concept from the dropdown and enter the student's response to predict their grade.")
-
-# Concept selection dropdown
-concept = st.selectbox("🧠 Select Concept", unique_concepts)
+if uploaded_file:
+    train_dataset, test_dataset, df, grade_mapping = load_and_process_data(uploaded_file)
+    unique_concepts = df["Concept"].dropna().unique().tolist()
     
-# Student response input
-student_answer = st.text_area("📝 Student's Answer", height=150)
+    st.write("Select the concept from the dropdown and enter the student's response to predict their grade.")
 
-# Button to fine-tune model
-if st.button("🎯 Fine-tune Model with New Dataset"):
-    if uploaded_file:
-        train_dataset, test_dataset, grade_mapping = load_and_process_data(uploaded_file)
+    # Concept selection dropdown
+    concept = st.selectbox("🧠 Select Concept", unique_concepts)
+    
+    # Student response input
+    student_answer = st.text_area("📝 Student's Answer", height=150)
+
+    # Button to fine-tune model
+    if st.button("🎯 Fine-tune Model with New Dataset"):
         fine_tune_model(train_dataset, test_dataset)
         st.success("✅ Model fine-tuned successfully!")
-else:
-    # If the model is already fine-tuned, allow grade prediction and feedback
+
+    # Button to predict grade and feedback
     if st.button("🎯 Predict Grade and Get Feedback"):
         if student_answer:
             predicted_grade = predict_grade(concept, student_answer)  # Predict grade
@@ -135,3 +137,5 @@ else:
             st.write(f"📋 **Feedback**: {feedback}")
         else:
             st.warning("⚠️ Please enter the student's response.")
+else:
+    st.warning("⚠️ Please upload the dataset to proceed.")
