@@ -1,49 +1,24 @@
 import streamlit as st
 import pandas as pd
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-import torch
 
 # ✅ File uploader to load dataset manually
 st.title("📚 AI-Powered Student Grading and Feedback")
 uploaded_file = st.file_uploader("Upload Behavioral Economics Dataset (CSV)", type="csv")
 
-# Load the model and tokenizer
-MODEL_NAME = "bert-base-uncased"
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME, num_labels=11)  # 11 grades (0 to 10)
-
-# Grade mapping (Ensure it matches your dataset's grades)
-grade_mapping = {0: "A+", 1: "A", 2: "A-", 3: "B+", 4: "B", 5: "B-", 6: "C+", 7: "C", 8: "C-", 9: "D", 10: "F"}
-
-# ✅ Function to predict grade based on student response
-def predict_grade(concept, student_response):
-    combined_input = f"Concept: {concept}. Student Answer: {student_response}"
-    inputs = tokenizer(combined_input, return_tensors="pt", truncation=True, padding=True)
-
-    with torch.no_grad():
-        outputs = model(**inputs)
-
-    # Get the predicted class (grade) index
-    predicted_class = torch.argmax(outputs.logits, dim=1).item()
-    predicted_grade = grade_mapping.get(predicted_class, "Unknown")
-    return predicted_grade
-
-# ✅ Function to generate feedback based on predicted grade
-def generate_feedback(grade):
-    feedback_mapping = {
-        "A+": "Excellent work! You have a deep understanding of the concept.",
-        "A": "Great job! You're very close to mastering this concept.",
-        "A-": "Good work, but there's room for improvement. Review the key concepts.",
-        "B+": "You're on the right track, but you might need more practice with the concept.",
-        "B": "Solid effort, but you need to focus on understanding the underlying principles.",
-        "B-": "You need to work on understanding the core concept more clearly.",
-        "C+": "Your response shows some understanding, but there are key areas that need attention.",
-        "C": "You have basic knowledge of the topic, but additional study is needed.",
-        "C-": "You're struggling with the core concepts. Please seek additional help.",
-        "D": "Your answer needs improvement. Consider revisiting the material.",
-        "F": "Unfortunately, your understanding of the concept is insufficient. Please review the content again."
-    }
-    return feedback_mapping.get(grade, "No feedback available")
+# Grade mapping for feedback
+feedback_mapping = {
+    "A+": "Excellent work! You have a deep understanding of the concept.",
+    "A": "Great job! You're very close to mastering this concept.",
+    "A-": "Good work, but there's room for improvement. Review the key concepts.",
+    "B+": "You're on the right track, but you might need more practice with the concept.",
+    "B": "Solid effort, but you need to focus on understanding the underlying principles.",
+    "B-": "You need to work on understanding the core concept more clearly.",
+    "C+": "Your response shows some understanding, but there are key areas that need attention.",
+    "C": "You have basic knowledge of the topic, but additional study is needed.",
+    "C-": "You're struggling with the core concepts. Please seek additional help.",
+    "D": "Your answer needs improvement. Consider revisiting the material.",
+    "F": "Unfortunately, your understanding of the concept is insufficient. Please review the content again."
+}
 
 # Streamlit UI for Concept Selection and Feedback Display
 if uploaded_file:
@@ -55,10 +30,10 @@ if uploaded_file:
     st.dataframe(df)  # Displays the uploaded dataset as a table
 
     # ✅ Ensure 'Concept' column exists
-    if "Concept" in df.columns:
+    if "Concept" in df.columns and "Student_Response" in df.columns and "Faculty_Grade" in df.columns:
         unique_concepts = df["Concept"].dropna().unique().tolist()
     else:
-        st.error("🚨 'Concept' column not found in dataset! Please check the file.")
+        st.error("🚨 Required columns ('Concept', 'Student_Response', 'Faculty_Grade') not found in dataset! Please check the file.")
         st.stop()
 
     # Concept selection dropdown
@@ -70,12 +45,19 @@ if uploaded_file:
     # Button to predict grade and feedback
     if st.button("🎯 Predict Grade and Get Feedback"):
         if student_answer:
-            predicted_grade = predict_grade(concept, student_answer)  # Predict grade
-            feedback = generate_feedback(predicted_grade)  # Generate feedback
+            # Match student response with the dataset to get the exact grade
+            matched_row = df[(df["Concept"] == concept) & (df["Student_Response"].str.lower() == student_answer.lower())]
 
-            # Display the predicted grade and feedback
-            st.success(f"✅ Predicted Grade: **{predicted_grade}**")
-            st.write(f"📋 **Feedback**: {feedback}")
+            if not matched_row.empty:
+                # Extract the predicted grade from the matched row
+                predicted_grade = matched_row["Faculty_Grade"].values[0]
+                feedback = feedback_mapping.get(predicted_grade, "No feedback available")
+
+                # Display the predicted grade and feedback
+                st.success(f"✅ Predicted Grade: **{predicted_grade}**")
+                st.write(f"📋 **Feedback**: {feedback}")
+            else:
+                st.warning("⚠️ No matching response found in the dataset.")
         else:
             st.warning("⚠️ Please enter the student's response.")
 else:
