@@ -1,83 +1,21 @@
 import streamlit as st
 import pandas as pd
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, Trainer, TrainingArguments
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
-from sklearn.model_selection import train_test_split
-from datasets import Dataset
-from sklearn.metrics import accuracy_score
 
 # ✅ File uploader to load dataset manually
-st.title("📚 AI-Powered Student Grading and Fine-Tuning")
+st.title("📚 AI-Powered Student Grading and Feedback")
 uploaded_file = st.file_uploader("Upload Behavioral Economics Dataset (CSV)", type="csv")
 
-# Load the dataset for fine-tuning
-def load_and_process_data(uploaded_file):
-    df = pd.read_csv(uploaded_file)
-    
-    # Prepare the dataset for fine-tuning
-    if "Concept" in df.columns and "Student_Response" in df.columns and "Faculty_Grade" in df.columns:
-        # Map grades to numeric labels (e.g., 'A+' -> 0, 'A' -> 1, etc.)
-        grade_mapping = {"A+": 0, "A": 1, "A-": 2, "B+": 3, "B": 4, "B-": 5, "C+": 6, "C": 7, "C-": 8, "D": 9, "F": 10}
-        df['Grade_Label'] = df['Faculty_Grade'].map(grade_mapping)
-        
-        # Split the data into train and test sets
-        train_df, test_df = train_test_split(df, test_size=0.2, random_state=42)
-        
-        # Convert to Hugging Face Dataset format
-        train_dataset = Dataset.from_pandas(train_df[['Concept', 'Student_Response', 'Grade_Label']])
-        test_dataset = Dataset.from_pandas(test_df[['Concept', 'Student_Response', 'Grade_Label']])
-
-        return train_dataset, test_dataset, df, grade_mapping
-    else:
-        st.error("🚨 'Concept', 'Student_Response', or 'Faculty_Grade' column not found in dataset! Please check the file.")
-        st.stop()
-
-# Load tokenizer and model
+# Load the model and tokenizer
 MODEL_NAME = "bert-base-uncased"
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME, num_labels=11)  # 11 grades (0 to 10)
 
-# Tokenize the dataset
-def tokenize_function(examples):
-    return tokenizer(examples['Concept'] + " " + examples['Student_Response'], padding="max_length", truncation=True)
+# Grade mapping (Ensure it matches your dataset's grades)
+grade_mapping = {0: "A+", 1: "A", 2: "A-", 3: "B+", 4: "B", 5: "B-", 6: "C+", 7: "C", 8: "C-", 9: "D", 10: "F"}
 
-# Fine-tune the model
-def fine_tune_model(train_dataset, test_dataset):
-    # Tokenize the datasets
-    train_dataset = train_dataset.map(tokenize_function, batched=True)
-    test_dataset = test_dataset.map(tokenize_function, batched=True)
-    
-    # Training arguments
-    training_args = TrainingArguments(
-        output_dir="./results",
-        num_train_epochs=3,
-        per_device_train_batch_size=16,
-        per_device_eval_batch_size=64,
-        warmup_steps=500,
-        weight_decay=0.01,
-        logging_dir='./logs',
-        logging_steps=10,
-        evaluation_strategy="epoch",
-        save_strategy="epoch"
-    )
-    
-    # Trainer setup
-    trainer = Trainer(
-        model=model,
-        args=training_args,
-        train_dataset=train_dataset,
-        eval_dataset=test_dataset,
-        compute_metrics=lambda p: {'accuracy': accuracy_score(p.predictions.argmax(-1), p.label_ids)}
-    )
-    
-    # Fine-tune the model
-    trainer.train()
-
-    # Save the fine-tuned model
-    model.save_pretrained('./fine_tuned_model')
-    tokenizer.save_pretrained('./fine_tuned_model')
-
-# Function to predict grade (after fine-tuning)
+# ✅ Function to predict grade based on student response
 def predict_grade(concept, student_response):
     combined_input = f"Concept: {concept}. Student Answer: {student_response}"
     inputs = tokenizer(combined_input, return_tensors="pt", truncation=True, padding=True)
@@ -87,11 +25,10 @@ def predict_grade(concept, student_response):
 
     # Get the predicted class (grade) index
     predicted_class = torch.argmax(outputs.logits, dim=1).item()
-    grade_mapping = {0: "A+", 1: "A", 2: "A-", 3: "B+", 4: "B", 5: "B-", 6: "C+", 7: "C", 8: "C-", 9: "D", 10: "F"}
     predicted_grade = grade_mapping.get(predicted_class, "Unknown")
     return predicted_grade
 
-# ✅ Function to generate feedback based on grade
+# ✅ Function to generate feedback based on predicted grade
 def generate_feedback(grade):
     feedback_mapping = {
         "A+": "Excellent work! You have a deep understanding of the concept.",
@@ -108,14 +45,21 @@ def generate_feedback(grade):
     }
     return feedback_mapping.get(grade, "No feedback available")
 
-# Streamlit UI for Concept Selection
+# Streamlit UI for Concept Selection and Feedback Display
 if uploaded_file:
-    train_dataset, test_dataset, df, grade_mapping = load_and_process_data(uploaded_file)
-    unique_concepts = df["Concept"].dropna().unique().tolist()
-    
+    # Load dataset
+    df = pd.read_csv(uploaded_file)
+
     # Show the dataset after it is uploaded
     st.write("Here is the dataset you've uploaded:")
     st.dataframe(df)  # Displays the uploaded dataset as a table
+
+    # ✅ Ensure 'Concept' column exists
+    if "Concept" in df.columns:
+        unique_concepts = df["Concept"].dropna().unique().tolist()
+    else:
+        st.error("🚨 'Concept' column not found in dataset! Please check the file.")
+        st.stop()
 
     # Concept selection dropdown
     concept = st.selectbox("🧠 Select Concept", unique_concepts)
@@ -123,13 +67,8 @@ if uploaded_file:
     # Student response input
     student_answer = st.text_area("📝 Student's Answer", height=150)
 
-    # Button to fine-tune model
-    if st.button("🎯 Fine-tune Model with New Dataset"):
-        fine_tune_model(train_dataset, test_dataset)
-        st.success("✅ Model fine-tuned successfully!")
-
     # Button to predict grade and feedback
-    if st.button("🎯 Predict Grade and Student Feedback"):
+    if st.button("🎯 Predict Grade and Get Feedback"):
         if student_answer:
             predicted_grade = predict_grade(concept, student_answer)  # Predict grade
             feedback = generate_feedback(predicted_grade)  # Generate feedback
