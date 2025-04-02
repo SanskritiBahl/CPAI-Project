@@ -113,7 +113,9 @@ if uploaded_file:
     train_dataset, test_dataset, df, grade_mapping = load_and_process_data(uploaded_file)
     unique_concepts = df["Concept"].dropna().unique().tolist()
     
-    st.write("Select the concept from the dropdown and enter the student's response to predict their grade.")
+    # Show the dataset after it is uploaded
+    st.write("Here is the dataset you've uploaded:")
+    st.dataframe(df)  # Displays the uploaded dataset as a table
 
     # Concept selection dropdown
     concept = st.selectbox("🧠 Select Concept", unique_concepts)
@@ -127,7 +129,7 @@ if uploaded_file:
         st.success("✅ Model fine-tuned successfully!")
 
     # Button to predict grade and feedback
-    if st.button("🎯 Predict Grade and Get Feedback"):
+    if st.button("🎯 Predict Grade and Student Feedback"):
         if student_answer:
             predicted_grade = predict_grade(concept, student_answer)  # Predict grade
             feedback = generate_feedback(predicted_grade)  # Generate feedback
