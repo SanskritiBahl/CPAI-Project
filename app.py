@@ -31,10 +31,10 @@ if uploaded_file:
         st.error(f"🚨 Model loading failed! Error: {e}")
         st.stop()
 
-    # ✅ Grade mapping
-    grade_mapping = {0: "A+", 1: "A", 2: "A-", 3: "B+", 4: "B", 5: "B-", 6: "C+", 7: "C", 8: "D", 9: "F"}
+    # ✅ Grade mapping (Ensure it matches the dataset's grades)
+    grade_mapping = {0: "A+", 1: "A", 2: "A-", 3: "B+", 4: "B", 5: "B-", 6: "C+", 7: "C", 8: "C-", 9: "D", 10: "F"}
 
-    # ✅ Function to predict grade
+    # ✅ Function to predict grade based on concept and student response
     def predict_grade(concept, student_response):
         combined_input = f"Concept: {concept}. Student Answer: {student_response}"
         inputs = tokenizer(combined_input, return_tensors="pt", truncation=True, padding=True)
@@ -42,8 +42,10 @@ if uploaded_file:
         with torch.no_grad():
             outputs = model(**inputs)
 
+        # Get the predicted class (grade) index
         predicted_class = torch.argmax(outputs.logits, dim=1).item()
-        return grade_mapping.get(predicted_class, "Unknown")
+        predicted_grade = grade_mapping.get(predicted_class, "Unknown")
+        return predicted_grade
 
     # ✅ Function to generate feedback based on grade
     def generate_feedback(grade):
@@ -65,13 +67,19 @@ if uploaded_file:
     # ✅ Streamlit UI for Concept Selection
     st.write("Select the concept from the dropdown and enter the student's response to predict their grade.")
 
+    # Concept selection dropdown
     concept = st.selectbox("🧠 Select Concept", unique_concepts)
+    
+    # Student response input
     student_answer = st.text_area("📝 Student's Answer", height=150)
 
-    if st.button("🎯 Predict Grade"):
+    # Button to predict grade and feedback
+    if st.button("🎯 Predict Grade and Get Feedback"):
         if student_answer:
-            predicted_grade = predict_grade(concept, student_answer)
-            feedback = generate_feedback(predicted_grade)
+            predicted_grade = predict_grade(concept, student_answer)  # Predict grade
+            feedback = generate_feedback(predicted_grade)  # Generate feedback
+
+            # Display the predicted grade and feedback
             st.success(f"✅ Predicted Grade: **{predicted_grade}**")
             st.write(f"📋 **Feedback**: {feedback}")
         else:
